@@ -26,11 +26,12 @@ class AlarmsEnv(discrete.DiscreteEnv):
     There are `2**(nrow*ncol)` discrete states alarm off (0) or alarm on (1) for each grid locations.
 
     Actions:
-    There are `nrow*ncol` discrete deterministic actions:
+    There are `nrow*ncol + 1` discrete deterministic actions:
     - X: try to turn off the alarm at location X
+    - Do nothing.
 
     Rewards:
-    There is a default per-step reward of -2 for each alarm on,
+    There is a default per-step reward of -1 for each alarm on,
     +10 to turn off an alarm,
     -5 to trying to turn off an alarm thats not on.
 
@@ -56,26 +57,22 @@ class AlarmsEnv(discrete.DiscreteEnv):
 
         for state in range(num_states):
             grid = self.decode(state)
-            # The episode is done when all the alarms are on, i.e. all the values of the grid are 1
-            done = False
-            if state == num_states - 1:
-                done = True
-            reward = -2 * grid.sum()  # default reward depending on the number of alarm on
             for p, next_grid in self._next_grids(grid):
-                for action in range(num_actions - 1):
+                for action in range(num_actions):
+                    reward = -1 * grid.sum()  # default reward depending on the number of alarm on
                     new_grid = next_grid.copy()
-                    i, j = self._action_to_pos(
-                        action
-                    )  # get the action as the position of the alarm he want to turn off
-                    if grid[i, j] == 1:
-                        reward = 10
-                        new_grid[i, j] = 0
-                    else:
-                        reward -= 5
+                    if action != num_actions - 1:  # For all except the last action
+                        i, j = self._action_to_pos(action)
+                        # if the alarm we're trying to turn off is on turn it off else punish
+                        if grid[i, j] == 1:
+                            reward += 10
+                            new_grid[i, j] = 0
+                        else:
+                            reward -= 5
                     # Encode new grid into it's corresponding state
                     new_state = self.encode(new_grid)
+                    done = new_state == num_states - 1  # The episode is done when all the alarms are on. grid full of 1
                     P[state][action].append((p, new_state, reward, done))
-                P[state][num_actions - 1].append((p, state, reward, done))
         # Verify P
         for state in P.keys():
             for action in P[state].keys():
