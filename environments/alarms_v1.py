@@ -14,21 +14,25 @@ MAP = [
 ]
 
 
-class AlarmsEnv(discrete.DiscreteEnv):
+class AlarmsWithLookEnv(discrete.DiscreteEnv):
     """
     Alarm Dashboard
 
     Description:
     Simple grid with random alarm that the agent need to turn off. The episode ends if all the alarm are on.
     At each step each alarm have a probability to turn on off 1/nb_alarm
+    The agent need to look at a location to know it's value.
 
     Observations:
-    There are `2**(nrow*ncol)` discrete states alarm off (0) or alarm on (1) for each grid locations.
+    There are `nrow*ncol * 2` discrete states. All except one of the grid locations are not known value that we represent by a 2.
+    And one location is known and it's value is either: alarm off (0) or alarm on (1).
 
     Actions:
-    There are `nrow*ncol + 1` discrete deterministic actions:
-    - X: try to turn off the alarm at location X
-    - Do nothing.
+    There are `nrow*ncol * 2` discrete deterministic actions:
+    - L: Look the value of the alarm at location L
+    - T: try to turn off the alarm at location X
+
+    The agent can look or turn off a location.
 
     Rewards:
     There is a default per-step reward of -1 for each alarm on,
@@ -39,7 +43,8 @@ class AlarmsEnv(discrete.DiscreteEnv):
     - o: alarm off
     - *: alarm on
 
-    state space is represented by the grid
+    state space is represented by:
+        (pos_row, pos_col, value)
     """
 
     metadata = {"render.modes": ["human", "ansi"]}
@@ -48,11 +53,12 @@ class AlarmsEnv(discrete.DiscreteEnv):
         self.desc = np.asarray(MAP, dtype="c")
         self.nrow = nrow = 3
         self.ncol = ncol = 3
-        num_states = 2 ** (nrow * ncol)
-        num_actions = (nrow * ncol) + 1
+        num_states = (nrow * ncol) * 2
+        num_actions = (nrow * ncol) * 2
 
         initial_state_distrib = np.zeros(num_states)
-        initial_state_distrib[0] = 1  # Initial state is always all the alarm are turned off
+        # Initial state is always all the alarm are turned off and the agent know the value of the top right alarm.
+        initial_state_distrib[0] = 1
         P = {state: {action: [] for action in range(num_actions)} for state in range(num_states)}
 
         for state in range(num_states):
@@ -79,7 +85,7 @@ class AlarmsEnv(discrete.DiscreteEnv):
                 assert np.array(P[state][action])[:, 0].sum() == 1, "Sum of probability should be equal to 1"
 
         initial_state_distrib /= initial_state_distrib.sum()
-        super(AlarmsEnv, self).__init__(num_states, num_actions, P, initial_state_distrib)
+        super(AlarmsWithLookEnv, self).__init__(num_states, num_actions, P, initial_state_distrib)
 
     def _next_grids(self, grid):
         next_grids = []
@@ -141,3 +147,11 @@ class AlarmsEnv(discrete.DiscreteEnv):
         if mode != "human":
             with closing(outfile):
                 return outfile.getvalue()
+
+
+if __name__ == "__main__":
+    """
+    Main class
+    """
+
+    env = AlarmsWithLookEnv()
